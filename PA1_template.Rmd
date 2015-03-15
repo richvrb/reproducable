@@ -1,0 +1,161 @@
+---
+title: "week2"
+author: "richard verbrugge"
+date: "Sunday, March 15, 2015"
+output: html_document
+---
+
+# Reproducible Research: Peer Assessment 1
+
+declare all required libs.
+
+```{r libraries}
+setwd("C:/coursera/reproduce/week2")
+library(plyr)
+library(ggplot2)
+library(lattice)
+library(ggplot2)
+library(knitr)
+library(markdown)
+knit(PA1_template.Rmd,PA1_template.md)
+```
+
+```{r,echo=TRUE}
+setwd("C:/coursera/reproduce/week2")
+library(plyr)
+library(ggplot2)
+library(lattice)
+library(ggplot2)
+```
+
+## Loading and preprocessing the data
+
+### 1. Load the data (i.e. read.csv())
+
+The following code unzips the data and reads it into the raw data set. Also, only 
+numbers >= 10^5 will be denoted in scientific notation. Round to 2 digits.
+
+```{r,echo = TRUE}
+setwd("C:/coursera/reproduce/week2")
+unzip("activity.zip")
+dataFile <- "activity.csv"
+act <- read.csv(dataFile)
+summary(act)
+
+```
+
+### 2. Process/transform the data (if necessary) into a format suitable for your analysis
+
+
+
+
+## What is mean total number of steps taken per day?
+
+### 1. Make a histogram of the total number of steps taken each day and calculate means
+
+```{r,echo = TRUE}
+actna <- na.omit(act)
+result <- ddply(actna, .(date), 
+                summarise, 
+                steps = sum(steps, na.rm=TRUE)
+)
+hist(result$steps, breaks = 20, col = "green", main = "Histogram of Daily Total Steps", xlab = "Steps")
+
+# calculate mean and median
+resultMean <- mean(result$steps, na.rm=TRUE)
+resultMedian <- median(result$steps, na.rm=TRUE)
+
+```
+
+ 
+
+### 1. Make a time series plot of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
+
+```{r,echo = TRUE}
+# time series
+actTS <- act
+actTS$interval <- as.factor(actTS$interval)
+interval_steps = aggregate(actTS[,1], by = list(actTS$interval), FUN = mean, na.rm=TRUE)                                                                                          
+names(interval_steps) = c("Interval", "Mean")
+interval_steps$Interval <- as.numeric(as.character(interval_steps$Interval))
+ggplot(data=interval_steps, aes(x=Interval,y=Mean)) + geom_line()
+```
+
+### 2. Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+
+```{r,echo = TRUE}
+max <- interval_steps[which.max(interval_steps$Mean),]$Interval
+max
+```
+
+## Imputing missing values
+
+### 1. Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with NAs)
+
+
+```{r,echo = TRUE}
+mv <- with(act, sum(is.na(steps)))
+mv
+```
+
+
+### 2. Devise a strategy for filling in all of the missing values in the dataset. The strategy does not need to be sophisticated. For example, you could use the mean/median for that day, or the mean for that 5-minute interval, etc.
+
+My strategy is to replace each missing value, with the average step value for that interval.
+
+```{r,echo = TRUE}
+actMV <- act
+
+for (i in 1:dim(actMV)[1]) {
+  if (is.na(actMV[i,]$steps)) { 
+    interval = actMV[i,]$interval
+    repl_value = interval_steps[interval_steps$Interval == interval,]$Mean
+    actMV[i,]$steps = repl_value
+  }
+}
+
+```
+
+
+### 3. Create a new dataset that is equal to the original dataset but with the missing data filled in.
+
+
+
+```{r,echo = TRUE}
+actMV_date_steps = with(actMV, aggregate(x=steps, by=list(date), FUN=function(x) sum(x, na.rm=TRUE)))
+
+```
+
+### 4. Make a histogram of the total number of steps taken each day and Calculate and report the mean and median total number of steps taken per day. Do these values differ from the estimates from the first part of the assignment? What is the impact of imputing missing data on the estimates of the total daily number of steps?
+
+
+
+```{r,echo = TRUE}
+hist(actMV_date_steps$x, breaks = 20, col = "lightblue", main = "Amended missing values Histogram of Daily Total Steps", xlab = "Steps")
+```
+
+## Are there differences in activity patterns between weekdays and weekends?
+
+### 1. Create a new factor variable in the dataset with two levels -- "weekday" and "weekend" 
+
+
+```{r,echo = TRUE}
+act$dayType = weekdays( as.Date(act$date) )
+weekends = (act$dayType == 'Saturday' | act$dayType == 'Sunday')
+
+act$dayType = 'weekend'
+act[!weekends,]$dayType = 'weekday'
+
+act$dayType = as.factor(act$dayType)
+```
+
+### 2. Make a panel plot containing a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) 
+
+
+```{r,echo = TRUE}
+steps_dayType = with(act, aggregate(x=steps, by=list(interval, dayType), 
+                                        FUN=function(x) mean(x, na.rm=T)))
+names(steps_dayType) = c("Time", "dayType", "Mean.Steps")
+xyplot(Mean.Steps ~ Time | dayType, data=steps_dayType, layout=c(1,2), type='l')
+
+```
